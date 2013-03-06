@@ -17,7 +17,7 @@ describe "WhenCommitted" do
     sample_class = Class.new(ActiveRecord::Base)
     model = sample_class.new
     model.should_not respond_to(:when_committed)
-    sample_class.send :include, WhenCommitted
+    sample_class.send :include, WhenCommitted::ActiveRecord
     model.should respond_to(:when_committed)
   end
 
@@ -79,7 +79,7 @@ describe "WhenCommitted" do
 end
 
 class Widget < ActiveRecord::Base
-  include WhenCommitted
+  include WhenCommitted::ActiveRecord
   def action_that_needs_follow_up_after_commit
     when_committed { Backgrounder.enqueue :important_work }
   end

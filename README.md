@@ -27,10 +27,10 @@ Or install it yourself as:
 
 ## Usage
 
-Include the WhenCommitted module in your model:
+Include the WhenCommitted::ActiveRecord module in your model:
 
     class Post < ActiveRecord::Base
-      include WhenCommitted
+      include WhenCommitted::ActiveRecord
     end
 
 Call `#when_committed` with a block of code that should run when the transaction
