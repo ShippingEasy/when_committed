@@ -8,6 +8,8 @@ module WhenCommitted
     when_committed_callbacks << block
   end
 
+  private
+
   def when_committed_callbacks
     @when_committed_callbacks ||= []
   end

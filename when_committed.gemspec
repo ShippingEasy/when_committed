@@ -19,4 +19,7 @@ dynamically define a block of code that should run when the transaction is commi
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.require_paths = ["lib"]
+  gem.add_dependency "activerecord", ">=3.1"
+  gem.add_development_dependency "activerecord-nulldb-adapter"
+  gem.add_development_dependency "rspec"
 end
