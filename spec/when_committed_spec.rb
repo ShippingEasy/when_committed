@@ -3,7 +3,8 @@ require 'when_committed'
 
 describe "WhenCommitted" do
   before(:all) do
-    ActiveRecord::Base.establish_connection :adapter => :nulldb
+    ActiveRecord::Base.establish_connection :adapter => :sqlite3,
+                                            :database => ":memory:"
     ActiveRecord::Migration.verbose = false
     ActiveRecord::Schema.define do
       create_table(:widgets) do |t|
