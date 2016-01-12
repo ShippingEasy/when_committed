@@ -12,7 +12,7 @@ module WhenCommitted
     end
 
     def when_committed!(&block)
-      if self.connection.open_transactions > 0
+      if self.class.connection.open_transactions > 0
         when_committed(&block)
       else
         block.call

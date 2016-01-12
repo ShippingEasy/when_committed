@@ -20,6 +20,6 @@ dynamically define a block of code that should run when the transaction is commi
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.require_paths = ["lib"]
   gem.add_dependency "activerecord", ">=3.1"
-  gem.add_development_dependency "activerecord-nulldb-adapter"
-  gem.add_development_dependency "rspec"
+  gem.add_development_dependency "sqlite3"
+  gem.add_development_dependency "rspec", "2.14.1"
 end
