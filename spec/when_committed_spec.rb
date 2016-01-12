@@ -11,11 +11,13 @@ describe "WhenCommitted" do
         t.string  :name
         t.integer :size
       end
+
+      create_table(:samples)
     end
   end
 
   it "provides a #when_committed method" do
-    sample_class = Class.new(ActiveRecord::Base)
+    sample_class = Sample
     model = sample_class.new
     model.should_not respond_to(:when_committed)
     sample_class.send :include, WhenCommitted::ActiveRecord
@@ -104,6 +106,9 @@ describe "WhenCommitted" do
       Backgrounder.should have(1).job
     end
   end
+end
+
+class Sample < ActiveRecord::Base
 end
 
 class Widget < ActiveRecord::Base
