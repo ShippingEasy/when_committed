@@ -24,8 +24,15 @@ module WhenCommitted
       @callback = callback
     end
 
-    def committed!
-      @callback.call
+    def committed!(should_run_callbacks=true)
+      # should_run_callbacks will only be false if we're in the process of
+      # raising an exception (caused by another callback) and AR is giving us
+      # a chance to clean up any internal state.
+      # We should be consistent with ActiveRecord and *not* run the remaining
+      # callbacks>
+      if should_run_callbacks
+        @callback.call
+      end
     end
 
     def rolledback!(*)
