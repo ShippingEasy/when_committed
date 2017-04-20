@@ -222,6 +222,30 @@ describe "WhenCommitted" do
 
         Backgrounder.jobs.should == [:first]
       end
+
+      it "calls on_skipped_callback when the block doesn't run when raise_in_transactional_callbacks is true" do
+        ActiveRecord::Base.raise_in_transactional_callbacks = true
+        @error_descriptions = []
+        WhenCommitted.on_skipped_callback = ->(desc){ @error_descriptions << desc }
+
+        w1 = Widget.new
+        w2 = Widget.new
+        w3 = Widget.new
+        w4 = Widget.new
+
+        expect {
+          Widget.transaction do
+            w1.when_committed("call1") { Backgrounder.enqueue :first }
+            w2.when_committed("call2") { raise Catastrophe }
+            w3.when_committed("call3") { Backgrounder.enqueue :third }
+            w4.when_committed { Backgrounder.enqueue :fourth }
+          end
+        }.to raise_error(Catastrophe)
+
+        expect(@error_descriptions.length).to eq(2)
+        expect(@error_descriptions[0]).to eq("call3")
+        expect(@error_descriptions[1]).to match(Regexp.escape(__FILE__))
+      end
     end
   end
 end
