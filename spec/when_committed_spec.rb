@@ -12,8 +12,15 @@ describe "WhenCommitted" do
         t.integer :size
       end
 
-      create_table(:samples)
+      create_table(:samples) do |t|
+        t.string :name
+      end
     end
+  end
+
+  before(:each) do
+    # Make sure exceptions aren't swallowed in tests
+    ActiveRecord::Base.raise_in_transactional_callbacks = true
   end
 
   it "provides a #when_committed method" do
@@ -24,7 +31,7 @@ describe "WhenCommitted" do
     model.should respond_to(:when_committed)
   end
 
-  describe "#when_committed!" do
+  describe "#when_committed(run_now_if_no_transaction: true)" do
     before do
       Backgrounder.reset
     end
@@ -47,8 +54,15 @@ describe "WhenCommitted" do
         end
         Backgrounder.jobs.should == [:important_work]
       end
-    end
 
+      it "runs the provided block, even if the model itself doesn't commit any changes" do
+        Widget.transaction do
+          model.needs_to_happen
+          Backgrounder.jobs.should be_empty
+        end
+        Backgrounder.jobs.should == [:important_work]
+      end
+    end
   end
 
   describe "#when_committed" do
@@ -57,10 +71,12 @@ describe "WhenCommitted" do
     end
     let(:model) { Widget.new }
 
-    it "runs the provided block after the transaction is committed" do
-      model.action_that_needs_follow_up_after_commit
-      model.save
-      Backgrounder.jobs.should == [:important_work]
+    context "when not running within a transaction" do
+      it "raises an exception" do
+        expect {
+          model.action_that_needs_follow_up_after_commit
+        }.to raise_error(WhenCommitted::RequiresTransactionError, /run_now_if_no_transaction/)
+      end
     end
 
     it "does not run the provided block until the transaction is committed" do
@@ -94,6 +110,14 @@ describe "WhenCommitted" do
       Backgrounder.jobs.should == [:important_work,:more_work]
     end
 
+    it "runs the provided block, even if the model itself doesn't commit any changes" do
+      Widget.transaction do
+        model.action_that_needs_follow_up_after_commit
+        Backgrounder.jobs.should be_empty
+      end
+      Backgrounder.jobs.should == [:important_work]
+    end
+
     it "does not run a registered block more than once" do
       Widget.transaction do
         model.action_that_needs_follow_up_after_commit
@@ -104,6 +128,100 @@ describe "WhenCommitted" do
         model.save
       end
       Backgrounder.should have(1).job
+    end
+
+    describe "nested transactions" do
+      it "runs the provided block once, after the outer transaction is committed" do
+        Widget.transaction do
+          model.action_that_needs_follow_up_after_commit
+          Widget.transaction(requires_new: true) do
+            model.another_action_with_follow_up
+          end
+          Backgrounder.jobs.should == []
+        end
+        Backgrounder.jobs.should == [:important_work, :more_work]
+      end
+
+      it "does not run the block if it is defined in a nested transaction that is rolled back" do
+        Widget.transaction do
+          model.action_that_needs_follow_up_after_commit
+          Widget.transaction(requires_new: true) do
+            model.another_action_with_follow_up
+            raise ActiveRecord::Rollback
+          end
+          Backgrounder.jobs.should == []
+        end
+        Backgrounder.jobs.should == [:important_work]
+      end
+
+      it "does not run the block from inner or outer transaction if exception raised in inner block" do
+        begin
+          Widget.transaction do
+            model.action_that_needs_follow_up_after_commit
+            Widget.transaction(requires_new: true) do
+              model.another_action_with_follow_up
+              raise Catastrophe
+            end
+            Backgrounder.jobs.should == []
+          end
+        rescue
+        end
+        Backgrounder.jobs.should == []
+      end
+
+      it "does not run the block from inner or outer transaction if exception raised in outer block" do
+        begin
+          Widget.transaction do
+            model.action_that_needs_follow_up_after_commit
+            Widget.transaction(requires_new: true) do
+              model.another_action_with_follow_up
+            end
+            raise Catastrophe
+          end
+        rescue
+        end
+        Backgrounder.jobs.should == []
+      end
+    end
+
+    context "when a previous callback raised an exception" do
+      it "still runs the block if raise_in_transactional_callbacks is false" do
+        ActiveRecord::Base.raise_in_transactional_callbacks = false
+
+        w1 = Widget.new
+        w2 = Widget.new
+        w3 = Widget.new
+        w4 = Widget.new
+
+        Widget.transaction do
+          w1.when_committed { Backgrounder.enqueue :first }
+          w2.when_committed { raise Catastrophe }
+          w3.when_committed { Backgrounder.enqueue :third }
+          w4.when_committed { Backgrounder.enqueue :fourth }
+        end
+
+        Backgrounder.jobs.should == [:first, :third, :fourth]
+      end
+
+      it "does not run the block if raise_in_transactional_callbacks is true" do
+        ActiveRecord::Base.raise_in_transactional_callbacks = true
+
+        w1 = Widget.new
+        w2 = Widget.new
+        w3 = Widget.new
+        w4 = Widget.new
+
+        expect {
+          Widget.transaction do
+            w1.when_committed { Backgrounder.enqueue :first }
+            w2.when_committed { raise Catastrophe }
+            w3.when_committed { Backgrounder.enqueue :third }
+            w4.when_committed { Backgrounder.enqueue :fourth }
+          end
+        }.to raise_error(Catastrophe)
+
+        Backgrounder.jobs.should == [:first]
+      end
     end
   end
 end
@@ -117,7 +235,7 @@ class Widget < ActiveRecord::Base
     when_committed { Backgrounder.enqueue :important_work }
   end
   def needs_to_happen
-    when_committed! { Backgrounder.enqueue :important_work }
+    when_committed(run_now_if_no_transaction: true) { Backgrounder.enqueue :important_work }
   end
   def another_action_with_follow_up
     when_committed { Backgrounder.enqueue :more_work }
