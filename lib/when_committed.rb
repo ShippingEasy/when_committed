@@ -24,7 +24,7 @@ module WhenCommitted
       @callback = callback
     end
 
-    def committed!(should_run_callbacks=true)
+    def committed!(should_run_callbacks: true, **)
       # should_run_callbacks will only be false if we're in the process of
       # raising an exception (caused by another callback) and AR is giving us
       # a chance to clean up any internal state.
@@ -37,6 +37,13 @@ module WhenCommitted
 
     def rolledback!(*)
     end
+
+    def before_committed!(*)
+    end
+
+    def add_to_transaction(*)
+    end
+
   end
 
   class RequiresTransactionError < StandardError
