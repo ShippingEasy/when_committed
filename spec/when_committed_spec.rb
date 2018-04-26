@@ -127,12 +127,15 @@ describe "WhenCommitted" do
 
     describe "nested transactions" do
       it "runs the provided block once, after the outer transaction is committed" do
+        # add extra layer just to prove it works at any level of nesting
         Widget.transaction do
-          model.action_that_needs_follow_up_after_commit
-          Widget.transaction(requires_new: true) do
-            model.another_action_with_follow_up
+          Widget.transaction do
+            model.action_that_needs_follow_up_after_commit
+            Widget.transaction(requires_new: true) do
+              model.another_action_with_follow_up
+            end
+            Backgrounder.jobs.should == []
           end
-          Backgrounder.jobs.should == []
         end
         Backgrounder.jobs.should == [:important_work, :more_work]
       end
