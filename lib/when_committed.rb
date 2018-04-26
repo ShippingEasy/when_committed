@@ -3,9 +3,10 @@ require 'when_committed/version'
 module WhenCommitted
   module ActiveRecord
     def when_committed(run_now_if_no_transaction: false, &block)
-      if self.class.connection.current_transaction.open?
-        cb = CallbackRecord.new(&block)
-        self.class.connection.current_transaction.add_record(cb)
+      cn = self.class.connection
+      if cn.current_transaction.open?
+        cb = CallbackRecord.new(cn, &block)
+        cn.add_transaction_record(cb)
       else
         if run_now_if_no_transaction
           block.call
@@ -18,9 +19,10 @@ module WhenCommitted
 
   # Adheres to the "record" duck type expected by the `add_record` method on
   # ActiveRecord::ConnnectionAdapters::Transaction
-  # https://github.com/rails/rails/blob/4-2-stable/activerecord/lib/active_record/connection_adapters/abstract/transaction.rb
+  # https://github.com/rails/rails/blob/5-1-stable/activerecord/lib/active_record/connection_adapters/abstract/transaction.rb
   class CallbackRecord
-    def initialize(&callback)
+    def initialize(connection, &callback)
+      @connection = connection
       @callback = callback
     end
 
@@ -42,6 +44,9 @@ module WhenCommitted
     end
 
     def add_to_transaction(*)
+      # The current transaction is resolving without handling this record, so
+      # pass it up to the parent transaction instead.
+      @connection.add_transaction_record(self)
     end
 
   end

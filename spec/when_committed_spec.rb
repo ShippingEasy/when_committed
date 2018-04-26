@@ -18,11 +18,6 @@ describe "WhenCommitted" do
     end
   end
 
-  before(:each) do
-    # Make sure exceptions aren't swallowed in tests
-    ActiveRecord::Base.raise_in_transactional_callbacks = true
-  end
-
   it "provides a #when_committed method" do
     sample_class = Sample
     model = sample_class.new
@@ -132,12 +127,15 @@ describe "WhenCommitted" do
 
     describe "nested transactions" do
       it "runs the provided block once, after the outer transaction is committed" do
+        # add extra layer just to prove it works at any level of nesting
         Widget.transaction do
-          model.action_that_needs_follow_up_after_commit
-          Widget.transaction(requires_new: true) do
-            model.another_action_with_follow_up
+          Widget.transaction do
+            model.action_that_needs_follow_up_after_commit
+            Widget.transaction(requires_new: true) do
+              model.another_action_with_follow_up
+            end
+            Backgrounder.jobs.should == []
           end
-          Backgrounder.jobs.should == []
         end
         Backgrounder.jobs.should == [:important_work, :more_work]
       end
@@ -185,27 +183,7 @@ describe "WhenCommitted" do
     end
 
     context "when a previous callback raised an exception" do
-      it "still runs the block if raise_in_transactional_callbacks is false" do
-        ActiveRecord::Base.raise_in_transactional_callbacks = false
-
-        w1 = Widget.new
-        w2 = Widget.new
-        w3 = Widget.new
-        w4 = Widget.new
-
-        Widget.transaction do
-          w1.when_committed { Backgrounder.enqueue :first }
-          w2.when_committed { raise Catastrophe }
-          w3.when_committed { Backgrounder.enqueue :third }
-          w4.when_committed { Backgrounder.enqueue :fourth }
-        end
-
-        Backgrounder.jobs.should == [:first, :third, :fourth]
-      end
-
-      it "does not run the block if raise_in_transactional_callbacks is true" do
-        ActiveRecord::Base.raise_in_transactional_callbacks = true
-
+      it "does not run the block" do
         w1 = Widget.new
         w2 = Widget.new
         w3 = Widget.new
