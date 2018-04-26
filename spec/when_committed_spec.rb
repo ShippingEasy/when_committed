@@ -18,11 +18,6 @@ describe "WhenCommitted" do
     end
   end
 
-  before(:each) do
-    # Make sure exceptions aren't swallowed in tests
-    ActiveRecord::Base.raise_in_transactional_callbacks = true
-  end
-
   it "provides a #when_committed method" do
     sample_class = Sample
     model = sample_class.new
@@ -185,27 +180,7 @@ describe "WhenCommitted" do
     end
 
     context "when a previous callback raised an exception" do
-      it "still runs the block if raise_in_transactional_callbacks is false" do
-        ActiveRecord::Base.raise_in_transactional_callbacks = false
-
-        w1 = Widget.new
-        w2 = Widget.new
-        w3 = Widget.new
-        w4 = Widget.new
-
-        Widget.transaction do
-          w1.when_committed { Backgrounder.enqueue :first }
-          w2.when_committed { raise Catastrophe }
-          w3.when_committed { Backgrounder.enqueue :third }
-          w4.when_committed { Backgrounder.enqueue :fourth }
-        end
-
-        Backgrounder.jobs.should == [:first, :third, :fourth]
-      end
-
-      it "does not run the block if raise_in_transactional_callbacks is true" do
-        ActiveRecord::Base.raise_in_transactional_callbacks = true
-
+      it "does not run the block" do
         w1 = Widget.new
         w2 = Widget.new
         w3 = Widget.new
