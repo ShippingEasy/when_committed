@@ -49,6 +49,12 @@ module WhenCommitted
       @connection.add_transaction_record(self)
     end
 
+    def trigger_transactional_callbacks?
+      # This method is meant to be a check whether the record has been persisted
+      # or destroyed, and if those callbacks need to be run. That doesn't apply
+      # here, so always return true.
+      true
+    end
   end
 
   class RequiresTransactionError < StandardError
